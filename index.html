@@ -4,6 +4,7 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Архетипи Богів — Визначення архетипу | Діти Дажбожі</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 <style>
   /* 1. Завантажуємо шрифт Рутенія Рада */
   @font-face {
@@ -125,12 +126,6 @@
 
   .hidden { display: none !important; }
 </style>
-<style>
-@media print {
-  /* Відключаємо друк самої сторінки, щоб юзер друкував лише через PDF генератор */
-  body { display: none; } 
-}
-</style>
 </head>
 <body>
 <div class="container">
@@ -226,7 +221,7 @@
 
     <!-- Кнопки дій -->
     <div class="action-btns">
-      <button class="btn primary" onclick="openPrintPage()">&#128438; Зберегти як PDF (для друку)</button>
+      <button class="btn primary" id="pdfBtn" onclick="openPrintPage()">&#128438; Зберегти у PDF &#128229;</button>
       <button class="btn" onclick="downloadHTML()" style="border-color:#4a9e7a;color:#4a9e7a;">&#8681; Зберегти як HTML файл</button>
       <button class="btn" onclick="location.reload()" style="border-color:var(--muted);color:var(--muted);">&#8635; Пройти знову</button>
     </div>
@@ -412,9 +407,48 @@ const MALE_DATA = {
 const FEMALE_VIRGIN_GROUP = ['ART','ATH','HES']; 
 const MALE_CLOSED_GROUP = ['ZEV','APL','AID'];
 
+const NEUTRALIZE_MAP = [
+  // Аніма (жіночі питання адаптовані для чоловіків)
+  ["Гордість від того що зробила це сама, без чужої допомоги", "Гордість від того що це зроблено самостійно, без чужої допомоги"],
+  ["Задоволення від того що план спрацював так як я задумала", "Задоволення від того що план спрацював саме так як планувалось"],
+  ["Відчуття що виконала своє призначення", "Відчуття виконаного призначення"],
+  ["Потрібна коли є важлива мета — ізоляція для роботи", "Потрібна самотність коли є важлива мета — ізоляція для роботи"],
+  ["Важко. Мені потрібні люди щоб відчувати себе живою", "Важко. Мені потрібні люди щоб відчувати повноту життя"],
+  ["Дім — місце де я можу бути справжньою без масок", "Дім — місце де я можу бути собою без масок"],
+  ["Це центральний смисл мого існування як жінки", "Це центральний смисл мого існування"],
+  ["Як ви бачите роль жінки у шлюбі або союзі:", "Як ви бачите свою роль у шлюбі або союзі:"],
+  ["Рівноправна цариця поруч з царем — кожен у своїй силі", "Рівноправний союз двох сильних особистостей — кожен у своїй силі"],
+  ["Серце родини — та що тримає всіх разом любов'ю", "Серце родини — тримати всіх разом любов'ю"],
+  ["Духовна супутниця — разом ростемо і пізнаємо", "Духовне партнерство — разом ростемо і пізнаємо"],
+  ["У материнстві і розвитку людей навколо мене", "У турботі і розвитку людей навколо мене"],
+  // Анімус (чоловічі питання адаптовані для жінок)
+  ["Тримаюсь осторонь і занурений у власні думки", "Тримаюсь осторонь і занурена у власні думки"],
+  ["Внутрішньо. Зовні виглядаю спокійним", "Внутрішньо. Зовні виглядаю спокійною"],
+  ["Кілька годин на день — після цього готовий до людей", "Кілька годин на день — після цього готова до людей"],
+  ["Схильний тримати певну дистанцію — близькість лякає", "Схильна тримати певну дистанцію — близькість лякає"],
+  ["Відданий і глибокий але рідко показую це", "Віддана і глибока але рідко показую це"],
+  ["Пристрасний і відкритий фізично", "Пристрасна і відкрита фізично"],
+  ["Легкий і незобов'язуючий", "Легка у спілкуванні без зайвих зобов'язань"],
+  ["Коли ви спілкуєтесь з незнайомими людьми:", "Як ви спілкуєтесь з незнайомими людьми:"],
+  ["Так і це формує мій характер — роблю сам і нікому нічого не доводжу", "Так і це формує мій характер — роблю сама і нікому нічого не доводжу"],
+  ["Так але я перетворив це на силу і рушій", "Так але я перетворила це на силу і рушій"],
+  ["Так і я занурився глибше в себе", "Так і я занурилась глибше в себе"],
+  ["Через майстерність — коли повністю поглинений роботою", "Через майстерність — коли повністю поглинута роботою"],
+  ["Приймаю своїх — до чужих більш обережний", "Приймаю своїх — до чужих більш обережна"]
+];
+
+function neutralizeText(text) {
+  if (!secondaryMode) return text;
+  for (const [from, to] of NEUTRALIZE_MAP) {
+    if (text === from) return to;
+  }
+  return text;
+}
+
 let clientName = '';
 let gender = null;
 let primaryGender = null;
+let dominantArchKey = null;
 let qIdx = 0;
 let answers = [];
 let questions = [];
@@ -443,6 +477,7 @@ function startQuiz(g) {
   questions = g === 'female' ? FEMALE_Q : MALE_Q;
   answers = new Array(questions.length).fill(null);
   qIdx = 0;
+  secondaryMode = false;
   document.getElementById('screen-gender').classList.add('hidden');
   document.getElementById('screen-quiz').classList.remove('hidden');
   const qTot = document.getElementById('q-total');
@@ -465,7 +500,7 @@ function showQ() {
   if (qCat) qCat.textContent = q.cat;
   
   const qText = document.getElementById('q-text');
-  if (qText) qText.textContent = q.text;
+  if (qText) qText.textContent = neutralizeText(q.text);
   
   const op = document.getElementById('q-options');
   if (!op) return;
@@ -475,7 +510,7 @@ function showQ() {
     const btn = document.createElement('button');
     const sel = Array.isArray(answers[qIdx]) && answers[qIdx].includes(i);
     btn.className = 'option' + (sel ? ' selected' : '');
-    btn.textContent = o.t;
+    btn.textContent = neutralizeText(o.t);
     btn.onclick = () => selectOpt(i);
     op.appendChild(btn);
   });
@@ -724,109 +759,162 @@ function showSecondaryResults() {
   window.scrollTo(0, document.body.scrollHeight);
 }
 
-function downloadHTML() {
-  const h = document.documentElement.outerHTML;
-  const blob = new Blob([h], {type:'text/html'});
-  const a = document.createElement('a');
-  a.href = URL.createObjectURL(blob);
-  a.download = `archetypy-rezultat-${clientName}.html`;
-  a.click();
-}
-
+// --- ОНОВЛЕНА ЛОГІКА PDF ТА HTML (ЯК У СОННИКУ) ---
 function openPrintPage() {
-  const win = window.open('','_blank');
-  
-  win.document.write(`
-  <!DOCTYPE html>
-  <html>
-  <head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width,initial-scale=1">
-    <title>Результат_${clientName}</title>
-    <style>
-      body {
-        margin: 0; padding: 20px;
-        font-family: Georgia, serif; line-height: 1.6; color: #222;
-        background-color: #fffaf0;
-      }
-      .page-wrapper {
-        max-width: 750px; margin: 0 auto; background: #ffffff;
-        border: 2px solid #8b7355; padding: 30px; position: relative;
-        box-shadow: 0 0 15px rgba(0,0,0,0.1);
-      }
-      .slavic-divider {
-        text-align: center; color: #8b7355; font-size: 22px;
-        margin: 20px 0; letter-spacing: 15px;
-      }
-      .card { margin-bottom:25px; padding:20px; border:1px solid #ddd; border-radius:10px; }
-      .harmony-box { background:#f0fff4; padding:15px; border-radius:8px; border:1px solid #c3e6cb; margin-top:10px; }
-      @media print {
-        body { background-color: #ffffff; }
-        .page-wrapper { border: none; padding: 0; box-shadow: none; }
-        .card { page-break-inside: avoid; }
-      }
-    </style>
-  </head>
-  <body>
-    <div class="page-wrapper">
-      <h1 style="color:#1a3a5c;text-align:center;margin-bottom:5px;">Діти Дажбожі</h1>
-      <h2 style="color:#8b7355;text-align:center;margin-top:0;">Профіль Архетипів: ${clientName}</h2>
-      <div class="slavic-divider">◈ ✧ ◈</div>
-  `);
+  const btn = document.getElementById('pdfBtn');
+  if (btn) {
+    btn.innerHTML = "⏳ Формуємо білий документ...";
+    btn.disabled = true;
+  }
 
-  primaryTopAll.forEach(([key,val], i) => {
-    let arch = primaryData[key];
-    let pc = Math.round(val/primaryTotal*100);
-    win.document.write(`
-      <div class="card">
-        <h2 style="color:#1a3a5c;margin:0 0 5px;">${i+1}. ${arch.name} (${pc}%)</h2>
-        <p style="color:#2a5fa0;margin:0 0 15px;font-style:italic;">${arch.greek} | ${arch.slavic} | ${arch.norse}</p>
-        <p><strong>Суть:</strong> ${arch.core}</p>
-        <p><strong>У житті:</strong> ${arch.life}</p>
-        <p><strong>Тінь:</strong> <span style="color:#b30000;">${arch.shadow}</span></p>
-        <div class="harmony-box">
-          <strong style="color:#1e5c2e;">Як гармонізувати:</strong> ${arch.harmony}
+  const printWrapper = document.createElement('div');
+  printWrapper.style.cssText = "background: #ffffff; color: #000000; padding: 25px; font-family: 'Georgia', serif; width: 100%; box-sizing: border-box; line-height: 1.6;";
+  
+  let html = `
+    <h1 style="text-align: center; color: #1a3a5c; margin: 0 0 5px 0;">Діти Дажбожі</h1>
+    <h2 style="text-align: center; color: #8b7355; margin: 0 0 15px 0; border-bottom: 2px solid #8b7355; padding-bottom: 10px;">ПРОФІЛЬ АРХЕТИПІВ: ${clientName}</h2>
+  `;
+
+  primaryTopAll.forEach(([key, val], i) => {
+    const arch = primaryData[key];
+    const pc = Math.round(val / primaryTotal * 100);
+    html += `
+      <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid;">
+        <h3 style="color: #1a3a5c; margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;">✵ ${i+1}. ${arch.name} (${pc}%)</h3>
+        <p style="font-size: 13px; color: #2a5fa0; font-style: italic; margin: 0 0 10px 0;">${arch.greek} | ${arch.slavic} | ${arch.norse}</p>
+        <p style="color: #111; margin: 6px 0;"><b>Суть:</b> ${arch.core}</p>
+        <p style="color: #111; margin: 6px 0;"><b>У житті:</b> ${arch.life}</p>
+        <p style="color: #b30000; margin: 6px 0;"><b>Тінь:</b> ${arch.shadow}</p>
+        <div style="background: #f0fff4; padding: 10px; border-radius: 6px; border: 1px solid #c3e6cb; margin-top: 8px; color: #1e5c2e;">
+          <b>Як гармонізувати:</b> ${arch.harmony}
         </div>
       </div>
-    `);
+    `;
   });
 
   if (secondaryTopAll && secondaryTopAll.length > 0) {
     const secLabel = primaryGender === 'female' ? 'АНІМУС (Прихована чоловіча сила)' : 'АНІМА (Прихована жіноча чуттєвість)';
-    win.document.write(`
-      <div class="slavic-divider" style="margin-top:40px;">◈ ✧ ◈</div>
-      <h2 style="color:#1a3a5c;text-align:center;margin-bottom:20px;text-transform:uppercase;">${secLabel}</h2>
-    `);
+    html += `<h2 style="text-align: center; color: #1a3a5c; margin: 30px 0 15px 0; border-bottom: 2px solid #1a3a5c; padding-bottom: 8px;">${secLabel}</h2>`;
     
-    secondaryTopAll.forEach(([key,val], i) => {
-      let arch = secondaryData[key];
-      let pc = Math.round(val/secondaryTotal*100);
-      win.document.write(`
-        <div class="card">
-          <h2 style="color:#1a3a5c;margin:0 0 5px;">${i+1}. ${arch.name} (${pc}%)</h2>
-          <p style="color:#2a5fa0;margin:0 0 15px;font-style:italic;">${arch.slavic} | ${arch.norse}</p>
-          <p><strong>Суть:</strong> ${arch.core}</p>
-          <p><strong>У житті:</strong> ${arch.life}</p>
-          <p><strong>Тінь:</strong> <span style="color:#b30000;">${arch.shadow}</span></p>
-          <div class="harmony-box">
-            <strong style="color:#1e5c2e;">Як гармонізувати:</strong> ${arch.harmony}
+    secondaryTopAll.forEach(([key, val], i) => {
+      const arch = secondaryData[key];
+      const pc = Math.round(val / secondaryTotal * 100);
+      html += `
+        <div style="margin-bottom: 20px; padding: 15px; border: 1px solid #ccc; border-radius: 8px; page-break-inside: avoid;">
+          <h3 style="color: #1a3a5c; margin: 0 0 5px 0; border-bottom: 1px solid #eee; padding-bottom: 4px;">✵ ${i+1}. ${arch.name} (${pc}%)</h3>
+          <p style="font-size: 13px; color: #2a5fa0; font-style: italic; margin: 0 0 10px 0;">${arch.slavic} | ${arch.norse}</p>
+          <p style="color: #111; margin: 6px 0;"><b>Суть:</b> ${arch.core}</p>
+          <p style="color: #111; margin: 6px 0;"><b>У житті:</b> ${arch.life}</p>
+          <p style="color: #b30000; margin: 6px 0;"><b>Тінь:</b> ${arch.shadow}</p>
+          <div style="background: #f0fff4; padding: 10px; border-radius: 6px; border: 1px solid #c3e6cb; margin-top: 8px; color: #1e5c2e;">
+            <b>Як гармонізувати:</b> ${arch.harmony}
           </div>
         </div>
-      `);
+      `;
     });
   }
 
-  win.document.write(`
-      <div style="text-align:center;margin-top:40px;padding:20px;background:#f9f9f9;border-radius:10px;border:1px dashed #ccc;">
-        <p style="font-weight:bold;margin:0;color:#222;">Підтримати автора проєкту (Донат):</p>
-        <a href="https://donatello.to/dity_dazhbozhi" style="color:#b38c22;text-decoration:none;font-weight:bold;word-break:break-all;font-size:1.1rem;">https://donatello.to/dity_dazhbozhi</a>
-      </div>
-      <div class="slavic-divider">◈ ✧ ◈</div>
-      <p style="text-align:center;color:#888;font-size:13px;margin-top:20px;">Щоб зберегти файл: Браузер &rarr; Поділитись / Друк &rarr; Зберегти як PDF</p>
+  html += `
+    <div style="text-align: center; margin-top: 25px; padding: 15px; border: 1px dashed #8b7355; border-radius: 8px;">
+      <p style="margin: 0; font-weight: bold; color: #222;">Підтримати автора проєкту (Донат):</p>
+      <p style="margin: 5px 0 0 0; color: #b38c22; font-weight: bold;">https://donatello.to/dity_dazhbozhi</p>
     </div>
-  </body></html>
-  `);
-  win.document.close();
+  `;
+
+  printWrapper.innerHTML = html;
+
+  const opt = {
+    margin:       10,
+    filename:     `Archetypy_${clientName}.pdf`,
+    image:        { type: 'jpeg', quality: 0.98 },
+    html2canvas:  { scale: 2, backgroundColor: '#ffffff', scrollY: 0, useCORS: true },
+    jsPDF:        { unit: 'mm', format: 'a4', orientation: 'portrait' }
+  };
+
+  html2pdf().set(opt).from(printWrapper).save().then(() => {
+    if (btn) {
+      btn.innerHTML = "&#128438; Зберегти у PDF &#128229;";
+      btn.disabled = false;
+    }
+  }).catch(() => {
+    alert("Помилка генерації PDF. Спробуйте кнопку 'Зберегти як HTML файл'.");
+    if (btn) {
+      btn.innerHTML = "&#128438; Зберегти у PDF &#128229;";
+      btn.disabled = false;
+    }
+  });
+}
+
+function downloadHTML() {
+  let cardsHtml = '';
+  
+  primaryTopAll.forEach(([key, val], i) => {
+    const arch = primaryData[key];
+    const pc = Math.round(val / primaryTotal * 100);
+    cardsHtml += `
+      <div class="card">
+        <h3>✵ ${i+1}. ${arch.name} (${pc}%)</h3>
+        <p class="sub">${arch.greek} | ${arch.slavic} | ${arch.norse}</p>
+        <p><b>Суть:</b> ${arch.core}</p>
+        <p><b>У житті:</b> ${arch.life}</p>
+        <p style="color:#e07a7a;"><b>Тінь:</b> ${arch.shadow}</p>
+        <div class="harm"><b>Як гармонізувати:</b> ${arch.harmony}</div>
+      </div>
+    `;
+  });
+
+  if (secondaryTopAll && secondaryTopAll.length > 0) {
+    const secLabel = primaryGender === 'female' ? 'АНІМУС (Прихована чоловіча сила)' : 'АНІМА (Прихована жіноча чуттєвість)';
+    cardsHtml += `<h2>✵ ${secLabel} ✵</h2>`;
+    secondaryTopAll.forEach(([key, val], i) => {
+      const arch = secondaryData[key];
+      const pc = Math.round(val / secondaryTotal * 100);
+      cardsHtml += `
+        <div class="card">
+          <h3>✵ ${i+1}. ${arch.name} (${pc}%)</h3>
+          <p class="sub">${arch.slavic} | ${arch.norse}</p>
+          <p><b>Суть:</b> ${arch.core}</p>
+          <p><b>У житті:</b> ${arch.life}</p>
+          <p style="color:#e07a7a;"><b>Тінь:</b> ${arch.shadow}</p>
+          <div class="harm"><b>Як гармонізувати:</b> ${arch.harmony}</div>
+        </div>
+      `;
+    });
+  }
+
+  const htmlContent = `<!DOCTYPE html>
+<html lang="uk">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Архетипи — ${clientName}</title>
+<style>
+  body { font-family: 'Georgia', serif; background: #0b0c10; color: #e5dcc5; padding: 20px; max-width: 720px; margin: 0 auto; line-height: 1.7; }
+  .box { background: #12131a; padding: 25px; border-radius: 12px; border: 1px solid #d4af37; }
+  h2 { color: #d4af37; text-align: center; margin-top: 10px; border-bottom: 1px solid #333; padding-bottom: 10px; }
+  h3 { color: #d4af37; border-bottom: 1px dashed #3a3227; padding-bottom: 5px; margin-top: 0; }
+  .card { background: rgba(255,255,255,0.03); padding: 18px; border-radius: 10px; border: 1px solid rgba(212,175,55,0.2); margin-bottom: 20px; }
+  .sub { color: #8a9bb0; font-style: italic; font-size: 0.9rem; margin-top: -5px; }
+  .harm { background: rgba(74,158,122,0.1); border: 1px solid rgba(74,158,122,0.3); padding: 12px; border-radius: 8px; color: #a0d4c0; margin-top: 10px; }
+  .donate { display: block; text-align: center; margin-top: 25px; padding: 15px; background: #d4af37; color: #0b0c10; text-decoration: none; font-weight: bold; border-radius: 8px; }
+</style>
+</head>
+<body>
+  <div class="box">
+    <h2>✵ Профіль Архетипів: ${clientName} ✵</h2>
+    ${cardsHtml}
+    <a href="https://donatello.to/dity_dazhbozhi" target="_blank" class="donate">💛 Підтримати проєкт (Донат)</a>
+  </div>
+</body>
+</html>`;
+
+  const blob = new Blob([htmlContent], { type: 'text/html;charset=utf-8' });
+  const link = document.createElement('a');
+  link.href = URL.createObjectURL(blob);
+  link.download = `Archetypy_${clientName}.html`;
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
 }
 </script>
 </body>
